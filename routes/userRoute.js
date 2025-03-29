@@ -2,6 +2,7 @@ import express from 'express';
 import User from '../models/userModel.js'
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
+import authMiddleware from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.post('/register', async (req, res) => {
       .status(500)
       .send({ message: 'Error creating user', success: false, error })
   }
-})
+});
 
 router.post('/login', async (req, res) => {
   try {
@@ -39,7 +40,7 @@ router.post('/login', async (req, res) => {
       return res
         .status(200)
         .send({ message: 'User does not exist', success: false });
-    }
+    };
     const isMatch = await bcrypt.compare(req.body.password, user.password);
     if (!isMatch) {
       return res
@@ -59,6 +60,28 @@ router.post('/login', async (req, res) => {
       .send({ message: 'Error logging in', success: false, error })
 
   }
-})
+});
+
+router.post('/get-user-info-by-id', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.body.userId });
+    user.password = undefined;
+    if (!user) {
+      return res
+        .status(200)
+        .send({ message: 'User does not exist', success: false });
+    } else {
+      res
+        .status(200)
+        .send({
+          success: true,
+          data: user,
+        });
+    }
+  } catch (error) {
+    res.status(500)
+      .send({ message: 'Error getting user info', success: false, error })
+  }
+});
 
 export default router;
