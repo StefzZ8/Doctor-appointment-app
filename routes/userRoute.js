@@ -1,5 +1,6 @@
 import express from 'express';
-import User from '../models/userModel.js'
+import User from '../models/userModel.js';
+import Doctor from '../models/doctorModel.js';
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import authMiddleware from '../middlewares/authMiddleware.js';
@@ -81,6 +82,74 @@ router.post('/get-user-info-by-id', authMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500)
       .send({ message: 'Error getting user info', success: false, error })
+  }
+});
+
+router.post('/apply-doctor-account', authMiddleware, async (req, res) => {
+  try {
+    const newdoctor = new Doctor({ ...req.body, status: 'pending' });
+    await newdoctor.save();
+    const adminUser = await User.findOne({ isAdmin: true });
+
+    const unseenNotifications = adminUser.unseenNotifications
+    unseenNotifications.push({
+      type: 'new-doctor-request',
+      message: `${newdoctor.firstName} ${newdoctor.lastName} has applied for a doctor account`,
+      data: {
+        doctorId: newdoctor._id,
+        name: newdoctor.firstName + " " + newdoctor.lastName
+      },
+      onClickPath: '/admin/doctors-list'
+    })
+    await User.findByIdAndUpdate(adminUser._id, { unseenNotifications });
+    res.status(200).send({
+      success: true,
+      message: 'Doctor account applied successfully'
+    })
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: 'Error applying doctor account ', success: false, error })
+  }
+});
+
+router.post('/mark-all-notifications-as-seen', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.body.userId })
+    const unseenNotifications = user.unseenNotifications;
+    const seenNotifications = user.seenNotifications;
+    seenNotifications.push(...unseenNotifications);
+    user.unseenNotifications = [];
+    user.seenNotifications = seenNotifications;
+    const updateUser = await user.save();
+    res.status(200).send({
+      success: true,
+      message: 'All notifications marked as seen',
+      data: updateUser,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: 'Error applying doctor account ', success: false, error })
+  }
+});
+
+router.post('/delete-all-notifications', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.body.userId })
+    user.seenNotifications = [];
+    user.unseenNotifications = [];
+    const updateUser = await user.save();
+    updateUser.password = undefined;
+    res.status(200).send({
+      success: true,
+      message: 'All notifications marked as seen',
+      data: updateUser,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ message: 'Error applying doctor account ', success: false, error })
   }
 });
 
